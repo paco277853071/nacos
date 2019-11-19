@@ -20,21 +20,20 @@ import com.alibaba.nacos.config.server.service.DataSourceService;
 import com.alibaba.nacos.config.server.service.DynamicDataSource;
 import com.alibaba.nacos.config.server.service.ServerListService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.PostConstruct;
 
-import static com.alibaba.nacos.common.util.SystemUtils.LOCAL_IP;
+import static com.alibaba.nacos.core.utils.SystemUtils.LOCAL_IP;
 
 /**
  * health service
  *
  * @author Nacos
  */
-@Controller
+@RestController
 @RequestMapping(Constants.HEALTH_CONTROLLER_PATH)
 public class HealthController {
 
@@ -45,15 +44,16 @@ public class HealthController {
     private String heathWarnStr = "WARN";
 
     @Autowired
-    public HealthController(DynamicDataSource dynamicDataSource) {this.dynamicDataSource = dynamicDataSource;}
+    public HealthController(DynamicDataSource dynamicDataSource) {
+        this.dynamicDataSource = dynamicDataSource;
+    }
 
     @PostConstruct
     public void init() {
         dataSourceService = dynamicDataSource.getDataSource();
     }
 
-    @ResponseBody
-    @RequestMapping(method = RequestMethod.GET)
+    @GetMapping
     public String getHealth() {
         // TODO UP DOWN WARN
         StringBuilder sb = new StringBuilder();
@@ -64,17 +64,17 @@ public class HealthController {
         } else if (dbStatus.contains(heathWarnStr) && ServerListService.isAddressServerHealth() && ServerListService
             .isInIpList()) {
             sb.append("WARN:");
-            sb.append("从数据库 ").append(dbStatus.split(":")[1]).append(" down. ");
+            sb.append("slave db (").append(dbStatus.split(":")[1]).append(") down. ");
         } else {
             sb.append("DOWN:");
             if (dbStatus.contains(heathDownStr)) {
-                sb.append("主数据库 ").append(dbStatus.split(":")[1]).append(" down. ");
+                sb.append("master db (").append(dbStatus.split(":")[1]).append(") down. ");
             }
             if (!ServerListService.isAddressServerHealth()) {
-                sb.append("地址服务器 down. ");
+                sb.append("address server down. ");
             }
             if (!ServerListService.isInIpList()) {
-                sb.append("server ").append(LOCAL_IP).append(" 不在地址服务器的IP列表中. ");
+                sb.append("server ip ").append(LOCAL_IP).append(" is not in the serverList of address server. ");
             }
         }
 

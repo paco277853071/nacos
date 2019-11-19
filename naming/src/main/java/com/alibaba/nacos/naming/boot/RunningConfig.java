@@ -15,9 +15,10 @@
  */
 package com.alibaba.nacos.naming.boot;
 
+import com.alibaba.nacos.core.utils.Constants;
+import com.alibaba.nacos.core.utils.PropertyUtil;
 import com.alibaba.nacos.naming.misc.Loggers;
-import com.alibaba.nacos.naming.raft.RaftCore;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.context.WebServerInitializedEvent;
 import org.springframework.context.ApplicationListener;
@@ -28,7 +29,7 @@ import javax.servlet.ServletContext;
 /**
  * @author nkorange
  */
-@Component
+@Component("runningConfig")
 public class RunningConfig implements ApplicationListener<WebServerInitializedEvent> {
 
     private static int serverPort;
@@ -38,21 +39,17 @@ public class RunningConfig implements ApplicationListener<WebServerInitializedEv
     @Autowired
     private ServletContext servletContext;
 
-    @SuppressFBWarnings("ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD")
+    private static volatile boolean isServerInitialized = false;
+
     @Override
     public void onApplicationEvent(WebServerInitializedEvent event) {
 
-        Loggers.SRV_LOG.info("[SERVER-INIT] got port:" + event.getWebServer().getPort());
-        Loggers.SRV_LOG.info("[SERVER-INIT] got path:" + servletContext.getContextPath());
+        Loggers.SRV_LOG.info("[SERVER-INIT] got port: {}", event.getWebServer().getPort());
+        Loggers.SRV_LOG.info("[SERVER-INIT] got path: {}", servletContext.getContextPath());
 
         serverPort = event.getWebServer().getPort();
         contextPath = servletContext.getContextPath();
-
-        try {
-            RaftCore.init();
-        } catch (Exception e) {
-            Loggers.RAFT.error("VIPSRV-RAFT", "failed to initialize raft sub system", e);
-        }
+        isServerInitialized = true;
     }
 
     public static int getServerPort() {
@@ -60,6 +57,15 @@ public class RunningConfig implements ApplicationListener<WebServerInitializedEv
     }
 
     public static String getContextPath() {
+
+        if (!isServerInitialized) {
+            String contextPath = PropertyUtil.getProperty(Constants.WEB_CONTEXT_PATH);
+            if (Constants.ROOT_WEB_CONTEXT_PATH.equals(contextPath)) {
+                return StringUtils.EMPTY;
+            } else {
+                return contextPath;
+            }
+        }
         return contextPath;
     }
 }
